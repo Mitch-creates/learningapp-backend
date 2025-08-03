@@ -3,9 +3,7 @@ import { processExplanation } from "../services/explanationService";
 import { ExplanationPayload } from "../constants/apiConstants";
 
 interface ExplainRequest {
-  Body: {
-    text: string;
-  };
+  Body: ExplanationPayload;
 }
 
 /**

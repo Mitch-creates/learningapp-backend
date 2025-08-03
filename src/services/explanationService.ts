@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { db } from "../db";
 import { explanations } from "../db/schema";
 import { ExplanationPayload } from "../constants/apiConstants";
+import { getContextSnippet } from "../utils/textProcessing";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -14,6 +15,27 @@ const openai = new OpenAI({
 export async function generateExplanation(
   explanationPayload: ExplanationPayload
 ): Promise<string> {
+  const { selectedText, fullText, startSelection, endSelection } =
+    explanationPayload;
+  // Create a new span object to use in our function call
+  const span = {
+    start_utf16: startSelection,
+    end_utf16: endSelection,
+    text: selectedText,
+  };
+  const { snippet, markedSnippet } = getContextSnippet(fullText, span, 400);
+  const messages = [
+    {
+      role: "system",
+      content:
+        "You explain the marked text («like this») in simple, concise language. 2–3 sentences. No fluff.",
+    },
+    {
+      role: "user",
+      content: `Context:\n${markedSnippet}\n\nTask: Explain the marked text («…»).`,
+    },
+  ];
+
   const completion = await openai.chat.completions.create({
     messages: [
       {
@@ -22,7 +44,7 @@ export async function generateExplanation(
       },
       {
         role: "user",
-        content: `Explain the following text in a simple and concise way: "${explanationPayload.context}"`,
+        content: `Explain the following text in a simple and concise way: "${markedSnippet}"`,
       },
     ],
     model: "gpt-3.5-turbo",
@@ -48,7 +70,7 @@ export async function saveExplanation(
     .insert(explanations)
     .values({
       selectedText: explanationPayload.selectedText,
-      context: explanationPayload.context,
+      fullText: explanationPayload.fullText,
       explanation,
     })
     .returning();
@@ -63,5 +85,6 @@ export async function processExplanation(
   explanationPayload: ExplanationPayload
 ) {
   const explanation = await generateExplanation(explanationPayload);
+
   return saveExplanation(explanationPayload, explanation);
 }
