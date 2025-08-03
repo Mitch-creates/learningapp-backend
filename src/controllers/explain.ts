@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { processExplanation } from "../services/explanationService";
+import { ExplanationPayload } from "../constants/apiConstants";
 
 interface ExplainRequest {
   Body: {
@@ -14,14 +15,14 @@ export async function explainHandler(
   request: FastifyRequest<ExplainRequest>,
   reply: FastifyReply
 ) {
-  const { text } = request.body;
+  const explanationPayload: ExplanationPayload = request.body;
 
-  if (!text) {
+  if (!explanationPayload.selectedText) {
     return reply.status(400).send({ error: "Text is required" });
   }
 
   try {
-    const result = await processExplanation(text);
+    const result = await processExplanation(explanationPayload);
 
     return reply.send({
       id: result.id,
