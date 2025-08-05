@@ -3,7 +3,7 @@ import Fastify from "fastify";
 import { db } from "./db";
 import { explanations } from "./db/schema";
 import OpenAI from "openai";
-import { explainHandler } from "./controllers";
+import { explainHandler, languageHandler } from "./controllers";
 
 const fastify = Fastify({
   logger: true,
@@ -19,6 +19,7 @@ const openai = new OpenAI({
 });
 
 fastify.post("/explain", explainHandler);
+fastify.post("/language", languageHandler);
 
 const start = async () => {
   try {

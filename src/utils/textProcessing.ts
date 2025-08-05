@@ -122,13 +122,14 @@ export function getContextSnippet(
   return { snippet, markedSnippet };
 }
 
-function stripMarkers(s: string, open = "«", close = "»") {
+export function stripMarkers(s: string, open = "«", close = "»") {
   return s.split(open).join("").split(close).join("");
 }
 
 export function detectLanguageFranc(text: string): LangGuess {
   const s = text.normalize("NFC");
   const code3 = franc(s, { minLength: 20 }); // e.g., 'eng', 'deu'
+
   if (code3 === "und") return { lang: "und", confidence: 0, method: "franc" };
 
   const info = langs.where("3", code3);
@@ -139,4 +140,203 @@ export function detectLanguageFranc(text: string): LangGuess {
 export function autonymFromIso1(code: string): string | null {
   const hit = langs.where("1", code.toLowerCase());
   return hit ? hit.local : null; // e.g., "Deutsch" for "de"
+}
+
+// --- Script heuristics (fast early exits) ---
+const RE = {
+  han: /[\u4E00-\u9FFF\u3400-\u4DBF]/g, // CJK Han
+  hiragana: /[\u3040-\u309F]/g,
+  katakana: /[\u30A0-\u30FF]/g,
+  hangul: /[\uAC00-\uD7AF]/g,
+  arabic: /[\u0600-\u06FF]/g,
+  cyrillic: /[\u0400-\u04FF]/g,
+  hebrew: /[\u0590-\u05FF]/g,
+  devan: /[\u0900-\u097F]/g,
+  thai: /[\u0E00-\u0E7F]/g,
+  greek: /[\u0370-\u03FF]/g,
+};
+
+// --- Minimal stopword lists for Latin-script languages ---
+const STOP: Record<string, string[]> = {
+  en: [
+    "the",
+    "and",
+    "to",
+    "of",
+    "in",
+    "is",
+    "for",
+    "on",
+    "with",
+    "that",
+    "it",
+    "as",
+    "are",
+    "was",
+    "be",
+  ],
+  de: [
+    "der",
+    "die",
+    "das",
+    "und",
+    "ist",
+    "nicht",
+    "ein",
+    "eine",
+    "zu",
+    "wir",
+    "sie",
+    "ich",
+    "mit",
+    "für",
+    "auf",
+  ],
+  fr: [
+    "le",
+    "la",
+    "les",
+    "et",
+    "de",
+    "des",
+    "en",
+    "pour",
+    "que",
+    "est",
+    "une",
+    "un",
+    "dans",
+    "avec",
+  ],
+  es: [
+    "el",
+    "la",
+    "los",
+    "las",
+    "y",
+    "de",
+    "que",
+    "en",
+    "por",
+    "para",
+    "con",
+    "no",
+    "una",
+    "es",
+    "un",
+  ],
+  nl: ["de", "het", "en", "van", "een", "is", "niet", "met"],
+  it: [
+    "il",
+    "la",
+    "le",
+    "e",
+    "di",
+    "che",
+    "in",
+    "per",
+    "è",
+    "una",
+    "un",
+    "con",
+    "non",
+  ],
+  pt: [
+    "o",
+    "a",
+    "os",
+    "as",
+    "e",
+    "de",
+    "que",
+    "em",
+    "para",
+    "com",
+    "não",
+    "uma",
+    "um",
+  ],
+  sv: ["och", "att", "det", "som", "en", "är", "inte", "med"],
+  da: ["og", "at", "det", "som", "en", "er", "ikke", "med"],
+  no: ["og", "det", "som", "en", "er", "ikke", "med"],
+  pl: ["i", "w", "nie", "jest", "z", "że", "na", "się"],
+  tr: ["ve", "bir", "bu", "için", "ile", "değil", "olan"],
+};
+
+function count(re: RegExp, s: string) {
+  const m = s.match(re);
+  return m ? m.length : 0;
+}
+
+function latinStopwordScore(text: string, lang: string) {
+  const words = text
+    .toLowerCase()
+    .replace(/[^\p{L}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 0) return 0;
+  const set = new Set(STOP[lang] || []);
+  const hits = words.reduce((n, w) => n + (set.has(w) ? 1 : 0), 0);
+  return hits / words.length; // simple ratio
+}
+
+/** Heuristic, zero-dependency language detection. */
+export function detectLanguageHeuristic(text: string): LangGuess {
+  const s = stripMarkers(text.normalize("NFC")).trim();
+  if (s.length < 2) return { lang: "und", confidence: 0, method: "heuristic" };
+
+  // Script-based detection
+  const han = count(RE.han, s);
+  const hira = count(RE.hiragana, s);
+  const kata = count(RE.katakana, s);
+  const hang = count(RE.hangul, s);
+  if (hang > 5 && hang > han)
+    return { lang: "ko", confidence: 0.98, method: "heuristic" };
+  if (hira + kata > 5)
+    return { lang: "ja", confidence: 0.98, method: "heuristic" };
+  if (han > 10) return { lang: "zh", confidence: 0.95, method: "heuristic" };
+  if (count(RE.arabic, s) > 10)
+    return { lang: "ar", confidence: 0.98, method: "heuristic" };
+  if (count(RE.cyrillic, s) > 10)
+    return { lang: "ru", confidence: 0.9, method: "heuristic" };
+  if (count(RE.hebrew, s) > 6)
+    return { lang: "he", confidence: 0.98, method: "heuristic" };
+  if (count(RE.devan, s) > 6)
+    return { lang: "hi", confidence: 0.9, method: "heuristic" };
+  if (count(RE.thai, s) > 6)
+    return { lang: "th", confidence: 0.98, method: "heuristic" };
+  if (count(RE.greek, s) > 6)
+    return { lang: "el", confidence: 0.98, method: "heuristic" };
+
+  // Latin-script: choose best stopword score
+  const candidates = [
+    "de",
+    "en",
+    "fr",
+    "es",
+    "nl",
+    "it",
+    "pt",
+    "sv",
+    "da",
+    "no",
+    "pl",
+    "tr",
+  ];
+  let bestLang = "und";
+  let bestScore = 0;
+  for (const lang of candidates) {
+    const score = latinStopwordScore(s, lang);
+    if (score > bestScore) {
+      bestScore = score;
+      bestLang = lang;
+    }
+  }
+
+  if (bestScore >= 0.01) {
+    const confidence = Math.min(0.99, 0.5 + bestScore * 10); // lightweight mapping
+    return { lang: bestLang, confidence, method: "heuristic" };
+  }
+
+  return { lang: "und", confidence: 0, method: "heuristic" };
 }
