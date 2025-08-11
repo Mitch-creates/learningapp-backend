@@ -40,14 +40,15 @@ export async function generateExplanation(
     messages: [
       {
         role: "system",
-        content: "You are a helpful assistant that explains things simply.",
+        content:
+          "Explain only the span between «» in the user's text. Output exactly 3 bullets in the context’s language: • Defn: plain meaning (or 1–2 senses if ambiguous). • Uses: typical use-cases/function. • Eg: 1–2 short example sentences (use context if helpful). ≤55 words total. No preface/extra text.",
       },
       {
         role: "user",
-        content: `Explain the following text in a simple and concise way: "${markedSnippet}"`,
+        content: markedSnippet,
       },
     ],
-    model: "gpt-3.5-turbo",
+    model: "gpt-4o-mini",
   });
 
   const explanation = completion.choices[0]?.message?.content;

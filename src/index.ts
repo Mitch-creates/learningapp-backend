@@ -4,6 +4,8 @@ import { db } from "./db";
 import { explanations } from "./db/schema";
 import OpenAI from "openai";
 import { explainHandler, languageHandler } from "./controllers";
+import { translateHandler } from "./controllers/translate";
+import { ttsHandler } from "./controllers/speech";
 
 const fastify = Fastify({
   logger: true,
@@ -20,6 +22,8 @@ const openai = new OpenAI({
 
 fastify.post("/explain", explainHandler);
 fastify.post("/language", languageHandler);
+fastify.post("/translate", translateHandler);
+fastify.post("/tts", ttsHandler);
 
 const start = async () => {
   try {
