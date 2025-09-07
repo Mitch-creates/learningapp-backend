@@ -4,7 +4,7 @@ const AZURE_TRANSLATE_ENDPOINT =
   process.env.AZURE_TRANSLATE_ENDPOINT ||
   "https://api.cognitive.microsofttranslator.com";
 const AZURE_TRANSLATE_KEY = process.env.AZURE_TRANSLATE_KEY!;
-const AZURE_TRANSLATE_REGION = process.env.AZURE_TRANSLATE_REGION || ""; // safe to include
+const AZURE_TRANSLATE_REGION = process.env.AZURE_TRANSLATE_REGION || ""; 
 
 export async function processTranslation(
   p: TranslationPayload
