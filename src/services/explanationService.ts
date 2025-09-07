@@ -24,28 +24,17 @@ export async function generateExplanation(
     text: selectedText,
   };
   const { snippet, markedSnippet } = getContextSnippet(fullText, span, 400);
-  const messages = [
-    {
-      role: "system",
-      content:
-        "You explain the marked text («like this») in simple, concise language. 2–3 sentences. No fluff.",
-    },
-    {
-      role: "user",
-      content: `Context:\n${markedSnippet}\n\nTask: Explain the marked text («…»).`,
-    },
-  ];
 
   const completion = await openai.chat.completions.create({
     messages: [
       {
         role: "system",
         content:
-          "Explain only the span between «» in the user's text. Output exactly 3 bullets in the context’s language: • Defn: plain meaning (or 1–2 senses if ambiguous). • Uses: typical use-cases/function. • Eg: 1–2 short example sentences (use context if helpful). ≤55 words total. No preface/extra text.",
+          "You are a precise explainer. Explain only the text between «» using the surrounding context to disambiguate. Respond in English. Output 1–3 short sentences (≤60 words total). Be clear and concrete. Do not repeat the quoted text, do not add headings, lists, examples, or prefaces.",
       },
       {
         role: "user",
-        content: markedSnippet,
+        content: `Context with selection marked:\n\n${markedSnippet}`,
       },
     ],
     model: "gpt-4o-mini",
